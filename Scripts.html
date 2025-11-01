@@ -1,0 +1,274 @@
+<script>
+  const APP_DATA = <?!= JSON.stringify(appData) ?>;
+
+  (function () {
+    const navButtons = document.querySelectorAll('.nav__item');
+    const views = document.querySelectorAll('.view');
+    const toast = document.getElementById('toast');
+    const entriesList = document.getElementById('entries-list');
+    const entriesForm = document.getElementById('entries-form');
+    const entryInput = document.getElementById('entry-input');
+    const assignForm = document.getElementById('assign-form');
+    const assignEntrySelect = document.getElementById('assign-entry');
+    const assignAmountInput = document.getElementById('assign-amount');
+    const recentRecordsList = document.getElementById('recent-records');
+    const totalsTableBody = document.querySelector('#totals-table tbody');
+    const refreshDashboardButton = document.getElementById('refresh-dashboard');
+
+    const state = {
+      entries: Array.isArray(APP_DATA.entries) ? APP_DATA.entries : [],
+      recentAssignments: Array.isArray(APP_DATA.recentAssignments) ? APP_DATA.recentAssignments : [],
+      totals: Array.isArray(APP_DATA.totals) ? APP_DATA.totals : [],
+    };
+
+    function setActiveView(target) {
+      navButtons.forEach((button) => {
+        const isTarget = button.dataset.view === target;
+        button.classList.toggle('is-active', isTarget);
+      });
+      views.forEach((view) => {
+        const isTarget = view.dataset.view === target;
+        view.classList.toggle('is-active', isTarget);
+      });
+    }
+
+    function showToast(message, type) {
+      if (!toast) return;
+      toast.textContent = message;
+      toast.className = 'toast';
+      if (type) {
+        toast.classList.add(`toast--${type}`);
+      } else {
+        toast.classList.add('toast--info');
+      }
+      requestAnimationFrame(() => {
+        toast.classList.add('is-visible');
+      });
+      clearTimeout(showToast.timeoutId);
+      showToast.timeoutId = setTimeout(() => {
+        toast.classList.remove('is-visible');
+      }, 3200);
+    }
+
+    function formatDate(value) {
+      if (!value) {
+        return '—';
+      }
+      try {
+        const date = new Date(value);
+        return date.toLocaleString();
+      } catch (error) {
+        return value;
+      }
+    }
+
+    function formatNumber(value) {
+      if (typeof value !== 'number' || Number.isNaN(value)) {
+        return value;
+      }
+      return new Intl.NumberFormat().format(value);
+    }
+
+    function renderEntries() {
+      entriesList.innerHTML = '';
+      if (!state.entries.length) {
+        const empty = document.createElement('div');
+        empty.className = 'empty-state';
+        empty.textContent = 'No entries yet. Add one to get started.';
+        entriesList.appendChild(empty);
+        return;
+      }
+      state.entries.forEach((entry) => {
+        const item = document.createElement('div');
+        item.className = 'list__item';
+        const name = document.createElement('span');
+        name.textContent = entry.name;
+        const timestamp = document.createElement('span');
+        timestamp.className = 'list__timestamp';
+        timestamp.textContent = formatDate(entry.createdAt);
+        item.appendChild(name);
+        item.appendChild(timestamp);
+        entriesList.appendChild(item);
+      });
+    }
+
+    function renderEntryOptions() {
+      const selected = assignEntrySelect.value;
+      assignEntrySelect.innerHTML = '';
+      if (!state.entries.length) {
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = 'Add an entry first';
+        option.disabled = true;
+        option.selected = true;
+        assignEntrySelect.appendChild(option);
+        assignEntrySelect.disabled = true;
+        return;
+      }
+      assignEntrySelect.disabled = false;
+      state.entries.forEach((entry, index) => {
+        const option = document.createElement('option');
+        option.value = entry.name;
+        option.textContent = entry.name;
+        if (entry.name === selected || (!selected && index === 0)) {
+          option.selected = true;
+        }
+        assignEntrySelect.appendChild(option);
+      });
+    }
+
+    function renderRecentAssignments() {
+      recentRecordsList.innerHTML = '';
+      if (!state.recentAssignments.length) {
+        const empty = document.createElement('li');
+        empty.className = 'empty-state';
+        empty.textContent = 'No records yet.';
+        recentRecordsList.appendChild(empty);
+        return;
+      }
+      state.recentAssignments.forEach((record) => {
+        const item = document.createElement('li');
+        item.className = 'recent-list__item';
+        const name = document.createElement('div');
+        name.textContent = `${record.name}`;
+        const meta = document.createElement('div');
+        meta.className = 'recent-list__meta';
+        meta.textContent = `${formatNumber(record.amount)} • ${formatDate(record.createdAt)}`;
+        item.appendChild(name);
+        item.appendChild(meta);
+        recentRecordsList.appendChild(item);
+      });
+    }
+
+    function renderTotals() {
+      totalsTableBody.innerHTML = '';
+      if (!state.totals.length) {
+        const row = document.createElement('tr');
+        const cell = document.createElement('td');
+        cell.colSpan = 2;
+        cell.className = 'empty-state';
+        cell.textContent = 'No totals yet.';
+        row.appendChild(cell);
+        totalsTableBody.appendChild(row);
+        return;
+      }
+      state.totals.forEach((item) => {
+        const row = document.createElement('tr');
+        const nameCell = document.createElement('td');
+        nameCell.textContent = item.name;
+        const totalCell = document.createElement('td');
+        totalCell.className = 'table__cell--right';
+        totalCell.textContent = formatNumber(item.total);
+        row.appendChild(nameCell);
+        row.appendChild(totalCell);
+        totalsTableBody.appendChild(row);
+      });
+    }
+
+    function renderAll() {
+      renderEntries();
+      renderEntryOptions();
+      renderRecentAssignments();
+      renderTotals();
+    }
+
+    function callServer(method, ...args) {
+      return new Promise((resolve, reject) => {
+        if (!(google && google.script && google.script.run && typeof google.script.run[method] === 'function')) {
+          reject(new Error('Server unavailable'));
+          return;
+        }
+        google.script.run
+          .withSuccessHandler((result) => {
+            if (result && result.success) {
+              resolve(result.data);
+            } else {
+              const error = new Error((result && result.message) || 'Request failed');
+              if (result && result.code) {
+                error.code = result.code;
+              }
+              reject(error);
+            }
+          })
+          .withFailureHandler((error) => {
+            reject(error);
+          })[method].apply(google.script.run, args);
+      });
+    }
+
+    entriesForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const name = entryInput.value.trim();
+      if (!name) {
+        showToast('Please enter a name before saving.', 'error');
+        return;
+      }
+      callServer('createEntry', name)
+        .then((data) => {
+          state.entries = data.entries || [];
+          renderEntries();
+          renderEntryOptions();
+          entryInput.value = '';
+          entryInput.focus();
+          showToast('Saved entry.', 'success');
+        })
+        .catch((error) => {
+          if (error && error.code === 'ENTRY_DUPLICATE') {
+            showToast('That entry already exists.', 'error');
+          } else {
+            showToast(error.message || 'Failed to save entry.', 'error');
+          }
+        });
+    });
+
+    assignForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const selectedName = assignEntrySelect.value;
+      const amountValue = assignAmountInput.value;
+      if (!selectedName) {
+        showToast('Please select an entry first.', 'error');
+        return;
+      }
+      if (!amountValue) {
+        showToast('Enter an amount to record.', 'error');
+        return;
+      }
+      callServer('createAssignment', selectedName, amountValue)
+        .then((data) => {
+          state.recentAssignments = data.recentAssignments || [];
+          state.totals = data.totals || [];
+          renderRecentAssignments();
+          renderTotals();
+          assignAmountInput.value = '';
+          showToast('Saved record.', 'success');
+        })
+        .catch((error) => {
+          let message = error && error.message ? error.message : 'Failed to record amount.';
+          if (error && error.code === 'ASSIGN_UNKNOWN_ENTRY') {
+            message = 'Selected entry could not be found.';
+          }
+          showToast(message, 'error');
+        });
+    });
+
+    refreshDashboardButton.addEventListener('click', () => {
+      callServer('fetchDashboard')
+        .then((data) => {
+          state.totals = data.totals || [];
+          renderTotals();
+          showToast('Dashboard updated.', 'success');
+        })
+        .catch((error) => {
+          showToast(error.message || 'Failed to refresh dashboard.', 'error');
+        });
+    });
+
+    navButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        setActiveView(button.dataset.view);
+      });
+    });
+
+    renderAll();
+  })();
+</script>

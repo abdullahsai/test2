@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Entries Dashboard</title>
+    <?!= include('Styles'); ?>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="sidebar__brand">Quick Assign</div>
+        <nav class="sidebar__nav">
+          <button class="nav__item is-active" data-view="entries">Entries</button>
+          <button class="nav__item" data-view="assign">Assign</button>
+          <button class="nav__item" data-view="dashboard">Dashboard</button>
+        </nav>
+      </aside>
+      <main class="main">
+        <section class="view is-active" data-view="entries">
+          <header class="view__header">
+            <h1>Entries</h1>
+            <p>Add new names or labels to use throughout the app.</p>
+          </header>
+          <form id="entries-form" class="form">
+            <label for="entry-input" class="form__label">Name or label</label>
+            <div class="form__row">
+              <input id="entry-input" name="entry" type="text" class="form__input" autocomplete="off" required />
+              <button type="submit" class="button">Save</button>
+            </div>
+          </form>
+          <div class="list" id="entries-list" aria-live="polite"></div>
+        </section>
+
+        <section class="view" data-view="assign">
+          <header class="view__header">
+            <h1>Assign</h1>
+            <p>Record amounts for an existing entry.</p>
+          </header>
+          <form id="assign-form" class="form">
+            <label for="assign-entry" class="form__label">Select entry</label>
+            <select id="assign-entry" class="form__input" required></select>
+            <label for="assign-amount" class="form__label">Amount</label>
+            <div class="form__row">
+              <input id="assign-amount" type="number" class="form__input" step="any" required />
+              <button type="submit" class="button">Record</button>
+            </div>
+          </form>
+          <div class="panel">
+            <div class="panel__header">
+              <h2>Recent records</h2>
+            </div>
+            <ul class="recent-list" id="recent-records" aria-live="polite"></ul>
+          </div>
+        </section>
+
+        <section class="view" data-view="dashboard">
+          <header class="view__header view__header--actions">
+            <div>
+              <h1>Dashboard</h1>
+              <p>Totals by entry.</p>
+            </div>
+            <button class="button" id="refresh-dashboard">Refresh</button>
+          </header>
+          <div class="panel">
+            <table class="table" id="totals-table" aria-live="polite">
+              <thead>
+                <tr>
+                  <th scope="col">Entry</th>
+                  <th scope="col" class="table__cell--right">Total</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+    <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+    <?!= include('Scripts'); ?>
+  </body>
+</html>
